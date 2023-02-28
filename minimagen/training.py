@@ -1,6 +1,7 @@
 import inspect
 import json
 import os
+from glob import glob
 import signal
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
@@ -141,6 +142,10 @@ def _fetch_single_image(image_url, timeout=None, retries=0):
             image = None
     return image
 
+def _read_local_single_image(image_url):
+    image = PIL.Image.open(image_url)
+    return image
+
 
 def _resize_image_to_square(image: torch.tensor,
                             target_image_size: int,
@@ -213,7 +218,7 @@ def get_minimagen_parser():
 
 class MinimagenDataset(torch.utils.data.Dataset):
     def __init__(self, hf_dataset, *, encoder_name: str, max_length: int,
-                 side_length: int, train: bool = True, img_transform=None):
+                 side_length: int, train: bool = True, img_transform=None, uselocal: bool = False):
         """
         MinImagen Dataset object
 
@@ -244,6 +249,7 @@ class MinimagenDataset(torch.utils.data.Dataset):
             self.img_transform = Compose([ToTensor(), _Rescale(side_length), img_transform])
         self.encoder_name = encoder_name
         self.max_length = max_length
+        self.uselocal = uselocal
 
     def __len__(self):
         return len(self.urls)
@@ -252,7 +258,11 @@ class MinimagenDataset(torch.utils.data.Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        img = _fetch_single_image(self.urls[idx])
+        if self.uselocal:
+            img = _read_local_single_image(self.urls[idx])
+        else:
+            img = _fetch_single_image(self.urls[idx])
+
         if img is None:
             return None
         elif self.img_transform:
@@ -312,6 +322,62 @@ def ConceptualCaptions(args, smalldata=False, testset=False):
             valid_dataset.indices = valid_dataset.indices[:args.VALID_NUM + 1]
         return train_dataset, valid_dataset
 
+def ECMAGE(args, smalldata=False, testset=False):
+    """
+    Load custom image and caption pair
+    """
+    src = r'\\fatherserverdw\Saurabh\Saurabh\skin\wsi\ECM_patches\64by64'
+    classes = ['young', 'middleage', 'old']
+    imlists = []
+    caplists = []
+    for ageclass in classes:
+        imlist = glob(os.path.join(*[src, 'train', ageclass, '*.png']), recursive=True)
+        caplist = [ageclass] * len(imlist)
+        imlists = imlists + imlist
+        caplists = caplists + caplist
+    imlists2 = []
+    caplists2 = []
+    for ageclass in classes:
+        imlist = glob(os.path.join(*[src, 'test', ageclass, '*.png']), recursive=True)
+        caplist = [ageclass] * len(imlist)
+        imlists2 = imlists2 + imlist
+        caplists2 = caplists2 + caplist
+    traindataset = {'image_url': imlists, 'caption': caplists}
+    validationdataset = {'image_url': imlists2, 'caption': caplists2}
+    dset = {'train': traindataset, 'validation': validationdataset}
+
+    if smalldata:
+        num = 16
+        vi = dset['validation']['image_url'][:num]
+        vc = dset['validation']['caption'][:num]
+        ti = dset['train']['image_url'][:num]
+        tc = dset['train']['caption'][:num]
+        dset = datasets.Dataset = {'train': {
+            'image_url': ti,
+            'caption': tc,
+        }, 'num_rows': num,
+            'validation': {
+                'image_url': vi,
+                'caption': vc, }, 'num_rows': num}
+
+    if testset:
+        # Torch test dataset
+        test_dataset = MinimagenDataset(dset, max_length=args.MAX_NUM_WORDS, train=False, encoder_name=args.T5_NAME,
+                                        side_length=args.IMG_SIDE_LEN, uselocal=True)
+        return test_dataset
+    else:
+        # Torch train/valid dataset
+        dataset_train_valid = MinimagenDataset(dset, max_length=args.MAX_NUM_WORDS, encoder_name=args.T5_NAME,
+                                               train=True,
+                                               side_length=args.IMG_SIDE_LEN, uselocal=True)
+
+        # Split into train/valid
+        train_size = int(args.TRAIN_VALID_FRAC * len(dataset_train_valid))
+        valid_size = len(dataset_train_valid) - train_size
+        train_dataset, valid_dataset = torch.utils.data.random_split(dataset_train_valid, [train_size, valid_size])
+        if args.VALID_NUM is not None:
+            valid_dataset.indices = valid_dataset.indices[:args.VALID_NUM + 1]
+        return train_dataset, valid_dataset
 
 def get_minimagen_dl_opts(device):
     """Returns dictionary of default MinImagen dataloader options"""

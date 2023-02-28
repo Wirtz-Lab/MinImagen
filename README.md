@@ -126,7 +126,7 @@ To generate images using a model from a [Training Directory](#training-directory
 For example, to generate images for the example captions provided in [`captions.txt`](https://github.com/AssemblyAI-Examples/MinImagen/blob/main/captions.txt) using the model generated from the above training line, simply run
     
 ```bash
-python inference.py -CAPTIONS captions.txt --TRAINING_DIRECTORY training_<TIMESTAMP>    
+python inference.py --CAPTIONS captions.txt --TRAINING_DIRECTORY training_<TIMESTAMP>    
 ```
 
 where `TIMESTAMP` is replaced with the appropriate value from your training.
