@@ -9,7 +9,7 @@ from minimagen.Imagen import Imagen
 from minimagen.Unet import Unet, Base, Super, BaseTest, SuperTest
 from minimagen.generate import load_minimagen, load_params
 from minimagen.t5 import get_encoded_dim
-from minimagen.training import get_minimagen_parser, ConceptualCaptions, get_minimagen_dl_opts, \
+from minimagen.training import get_minimagen_parser, ConceptualCaptions, ECMAGE, get_minimagen_dl_opts, \
     create_directory, get_model_params, get_model_size, save_training_info, get_default_args, MinimagenTrain, \
     load_restart_training_parameters, load_testing_parameters
 
@@ -43,7 +43,7 @@ if args.TESTING:
     args = load_testing_parameters(args)
     train_dataset, valid_dataset = ConceptualCaptions(args, smalldata=True)
 else:
-    train_dataset, valid_dataset = ConceptualCaptions(args, smalldata=False)
+    train_dataset, valid_dataset = ECMAGE(args, smalldata=False)
 
 # Create dataloaders
 dl_opts = {**get_minimagen_dl_opts(device), 'batch_size': args.BATCH_SIZE, 'num_workers': args.NUM_WORKERS}
