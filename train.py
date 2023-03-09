@@ -43,7 +43,8 @@ if args.TESTING:
     args = load_testing_parameters(args)
     train_dataset, valid_dataset = ConceptualCaptions(args, smalldata=True)
 else:
-    train_dataset, valid_dataset = ECMAGE(args, smalldata=False)
+    train_dataset, valid_dataset = ConceptualCaptions(args, smalldata=False)
+    # train_dataset, valid_dataset = ECMAGE(args, smalldata=False)
 
 # Create dataloaders
 dl_opts = {**get_minimagen_dl_opts(device), 'batch_size': args.BATCH_SIZE, 'num_workers': args.NUM_WORKERS}
